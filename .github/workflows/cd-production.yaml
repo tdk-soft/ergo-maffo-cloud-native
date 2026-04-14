@@ -1,0 +1,104 @@
+name: CD - Deploy to Production
+
+on:
+  workflow_run:
+    workflows: ["CD - Deploy to Staging"]
+    branches: ["main"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      rollback:
+        description: 'Rollback to previous version'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  ENVIRONMENT: production
+  NAMESPACE: ergo
+  DOMAIN: ergo.tdksoft.com
+  KUSTOMIZE_PATH: k8s/overlays/production
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    environment: production-approval
+    steps:
+      - name: Wait for manual approval
+        run: echo "Waiting for production approval"
+  
+  deploy:
+    runs-on: ubuntu-latest
+    needs: approve
+    if: ${{ github.event.workflow_run.conclusion == 'success' && !inputs.rollback }}
+    environment:
+      name: production
+      url: https://ergo.tdksoft.com
+    concurrency:
+      group: production-deployment
+      cancel-in-progress: false
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup kubectl
+        uses: ./.github/actions/setup-kubectl
+        with:
+          kubeconfig: ${{ secrets.KUBE_CONFIG_BASE64_PROD }}
+      
+      - name: Verify image exists
+        run: |
+          LATEST_TAG=$(kustomize build ${{ env.KUSTOMIZE_PATH }} | grep -oP 'image: \K.*' | head -1)
+          docker manifest inspect $LATEST_TAG
+      
+      - name: Canary deployment (10%)
+        uses: ./.github/actions/canary-deploy
+        with:
+          weight: 10
+          namespace: ${{ env.NAMESPACE }}
+      
+      - name: Monitor canary
+        run: |
+          ./.github/scripts/monitor-canary.sh ${{ env.DOMAIN }} --duration=300
+      
+      - name: Full deployment
+        uses: ./.github/actions/deploy-kustomize
+        with:
+          path: ${{ env.KUSTOMIZE_PATH }}
+          namespace: ${{ env.NAMESPACE }}
+          strategy: rolling
+          max-surge: 25%
+          max-unavailable: 0
+      
+      - name: Run full validation
+        run: |
+          ./.github/scripts/validate-deployment.sh ${{ env.NAMESPACE }}
+          ./.github/scripts/health-check.sh ${{ env.DOMAIN }}
+      
+      - name: Notify on success
+        uses: ./.github/actions/notify-slack
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_PROD }}
+          status: success
+          environment: production
+  
+  rollback:
+    runs-on: ubuntu-latest
+    needs: approve
+    if: inputs.rollback == true
+    environment: production-rollback
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Rollback deployment
+        run: |
+          ./.github/scripts/rollback.sh ${{ env.NAMESPACE }} ${{ env.DEPLOYMENT_NAME }}
+          kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} -n ${{ env.NAMESPACE }}
+      
+      - name: Notify rollback
+        uses: ./.github/actions/notify-slack
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_PROD }}
+          status: rollback
+          environment: production
