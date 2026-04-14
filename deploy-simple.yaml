@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ergo-development
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ergo-config
+  namespace: ergo-development
+data:
+  NODE_ENV: "development"
+  LOG_LEVEL: "debug"
+  PORT: "3000"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ergo-secrets
+  namespace: ergo-development
+type: Opaque
+data:
+  API_KEY: ZGV2LWtleS0xMjM0NQ==
+  JWT_SECRET: ZGV2LXNlY3JldC1rZXk=
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ergo-site
+  namespace: ergo-development
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ergo-site
+  template:
+    metadata:
+      labels:
+        app: ergo-site
+    spec:
+      containers:
+      - name: ergo-site
+        image: ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: ergo-config
+              key: NODE_ENV
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: ergo-config
+              key: PORT
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ergo-secrets
+              key: API_KEY
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ergo-service
+  namespace: ergo-development
+spec:
+  type: NodePort
+  ports:
+  - port: 3000
+    targetPort: 3000
+    nodePort: 30080
+  selector:
+    app: ergo-site
