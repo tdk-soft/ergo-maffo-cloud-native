@@ -1,7 +1,6 @@
 # GitHub Actions workflow for building and deploying Ergo Site to VPS cluster
 name: Deploy Ergo Site
 
-# Trigger the workflow on pushes to main (CI) and version tags (Release/CD)
 on:
   push:
     branches:
@@ -17,15 +16,15 @@ jobs:
       packages: write
 
     steps:
-      # Step 1: Checkout the source code from the repository
+      # Step 1: Checkout the source code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Step 2: Set up Docker Buildx for optimized image building
+      # Step 2: Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Step 3: Log in to GitHub Container Registry
+      # Step 3: Log in to GHCR
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -33,7 +32,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GH_PAT }}
 
-      # Step 4: Generate intelligent Docker tags (branch name or Git tag)
+      # Step 4: Extract Metadata for tagging
       - name: Extract Metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -44,7 +43,7 @@ jobs:
             type=ref,event=tag
             type=sha,format=short
 
-      # Step 5: Build image and push to GHCR using the extracted metadata
+      # Step 5: Build and Push image
       - name: Build and Push
         uses: docker/build-push-action@v5
         with:
@@ -53,43 +52,30 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      # Step 6: Install Kustomize CLI on the runner
+      # Step 6: Set up Kustomize CLI (Required for the deploy action's kustomize mode)
       - name: Set up Kustomize
         uses: imranismail/setup-kustomize@v2
 
-      # Step 7: Patch the Kubernetes manifests with the new image version
-      - name: Update and Build Kustomize Manifest
+      # Step 7: Update the Kustomize image tag locally
+      # We still do this step to ensure the local kustomization.yaml is updated
+      - name: Update Kustomize Image
         run: |
           cd k8s/overlays/production
-          
-          # Use the version output from Step 4 (e.g., 'main' or 'v1.0.3')
-          # This ensures Kustomize points to the image we just pushed
           kustomize edit set image ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site=ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.version }}
-          
-          # Compile all base + overlay resources into one single YAML file
-          kustomize build . > rendered-manifest.yaml
 
-      # Step 8: Apply the rendered manifest to the remote VPS cluster
+      # Step 8: Set Kubernetes Context using the KUBE_CONFIG secret
+      - name: Set Kubernetes Context
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG_BASE64 }} # Assuming Base64; use KUBE_CONFIG if raw text
+
+      # Step 9: Deploy using the Kustomization path
       - name: Deploy to VPS Cluster
-        run: |
-          # Check if the secret is configured in GitHub to avoid silent failures
-          if [ -z "${{ secrets.KUBE_CONFIG_BASE64 }}" ]; then
-            echo "ERROR: Secret KUBE_CONFIG is empty or not found!"
-            exit 1
-          fi
-
-          mkdir -p $HOME/.kube
-          
-          echo "${{ secrets.KUBE_CONFIG_BASE64 }}" | base64 -d > $HOME/.kube/config
-          
-          chmod 600 $HOME/.kube/config
-          
-          # Validate connection to the VPS
-          echo "Connecting to cluster..."
-          kubectl cluster-info
-          
-          # Apply changes. Kustomize will handle the 'prod-' prefixing automatically
-          kubectl apply -f k8s/overlays/production/rendered-manifest.yaml --namespace ergo-prod
-          
-          # Crucial: Wait for the pods to be 'Ready'. Fails the job if pods crash or can't pull images.
-          kubectl rollout status deployment prod-ergo-site -n ergo-prod --timeout=150s
+        uses: azure/k8s-deploy@v5
+        with:
+          action: deploy
+          strategy: basic
+          # Point directly to the kustomization directory
+          kustomizationPath: ./k8s/overlays/production
+          namespace: ergo-prod
