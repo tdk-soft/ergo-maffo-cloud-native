@@ -1,81 +1,94 @@
+# GitHub Actions workflow for building and deploying Ergo Site to VPS cluster
 name: Deploy Ergo Site
 
+# Trigger the workflow on specific events
 on:
   push:
-      - main
+    branches:
+      - main                        # Triggers on pushes to the main branch
     tags:
-      - 'v*' # Triggers on v1.0.0, v1.0.1, v1.0.2, etc.
+      - 'v*'                        # Triggers on version tags like v1.0.0, v1.0.1, etc.
 
+# Define the jobs to be executed
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest          # Use Ubuntu latest as the runner environment
     permissions:
-      contents: read
-      packages: write
+      contents: read                # Required to read repository contents
+      packages: write               # Required to push Docker images to GHCR
 
     steps:
+      # Step 1: Check out the repository code
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Step 2: Set up Docker Buildx for multi-platform builds
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Step 3: Log in to GitHub Container Registry (GHCR)
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GH_PAT }}
+          password: ${{ secrets.GH_PAT }}   # Personal Access Token with write permissions
 
+      # Step 4: Extract metadata (tags, labels) for the Docker image
       - name: Extract Metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
 
+      # Step 5: Build and push the Docker image to GHCR
       - name: Build and Push
         uses: docker/build-push-action@v5
         with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          context: .                           # Build context is the current directory
+          push: true                           # Push the image to the registry
+          tags: ${{ steps.meta.outputs.tags }} # Use generated tags from metadata
+          labels: ${{ steps.meta.outputs.labels }} # Use generated labels
 
+      # Step 6: Set up Kustomize for Kubernetes manifest management
       - name: Set up Kustomize
         uses: imranismail/setup-kustomize@v2
 
+      # Step 7: Update and build the Kustomize manifest
       - name: Update and Build Kustomize Manifest
         run: |
-          # 1. Extract tag name from ref (e.g., v1.0.2)
+          # Extract the tag name from the Git reference (e.g., v1.0.2)
           TAG_NAME=${GITHUB_REF#refs/tags/}
           cd k8s/overlays/production
           
-          # 2. Update the image tag in the production overlay
+          # Update the image tag in the production overlay
           kustomize edit set image ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site=ghcr.io/${{ github.repository }}:$TAG_NAME
           
-          # 3. Render the full multi-resource manifest into a single file
+          # Render the full multi-resource manifest into a single file
           kustomize build . > rendered-manifest.yaml
 
+      # Step 8: Deploy the rendered manifest to the VPS cluster
       - name: Deploy to VPS Cluster
         run: |
-          # 1. Security check for the secret
-          if [ -z "${{ secrets.KUBE_CONFIG }}" ]; then
+          # Security check: Verify that the KUBE_CONFIG secret is present and not empty
+          if [ -z "${{ secrets.KUBE_CONFIG_BASE64 }}" ]; then
             echo "ERROR: Secret KUBE_CONFIG is empty or not found!"
             exit 1
           fi
 
-          # 2. Setup directory and injection
+          # Create the .kube directory if it doesn't exist
           mkdir -p $HOME/.kube
-          # Use printf to avoid character escaping issues
-          printf "%s" "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
-          chmod 600 $HOME/.kube/config
           
-          # 3. Test connection before applying
+          # Inject the kubeconfig content using printf to avoid character escaping issues
+          printf "%s" "${{ secrets.KUBE_CONFIG_BASE64 }}" > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config    # Restrict permissions for security
+          
+          # Test the connection to the cluster before applying manifests
           echo "Testing connection to cluster..."
           kubectl cluster-info
           
-          # 4. Apply the manifest
+          # Apply the rendered Kubernetes manifest to the ergo-prod namespace
           kubectl apply -f k8s/overlays/production/rendered-manifest.yaml --namespace ergo-prod
           
-          # 5. Verify the deployment
+          # Wait for and verify the deployment rollout status (timeout: 120 seconds)
           kubectl rollout status deployment prod-ergo-site -n ergo-prod --timeout=120s
