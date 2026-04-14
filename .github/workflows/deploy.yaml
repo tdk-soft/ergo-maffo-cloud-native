@@ -40,6 +40,10 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch,pattern={{branch}},suffix=
+            type=ref,event=tag,pattern={{tag}}
+            type=sha,format=short,prefix={{branch}}-
 
       # Step 5: Build and push the Docker image to GHCR
       - name: Build and Push
@@ -57,12 +61,12 @@ jobs:
       # Step 7: Update and build the Kustomize manifest
       - name: Update and Build Kustomize Manifest
         run: |
-          # Extract the tag name from the Git reference (e.g., v1.0.2)
+          # Extract the tag name from the Git reference
           TAG_NAME=${GITHUB_REF#refs/tags/}
           cd k8s/overlays/production
           
           # Update the image tag in the production overlay
-          kustomize edit set image ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site=ghcr.io/${{ github.repository }}:$TAG_NAME
+          kustomize edit set image ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site=ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.version }}
           
           # Render the full multi-resource manifest into a single file
           kustomize build . > rendered-manifest.yaml
@@ -70,9 +74,9 @@ jobs:
       # Step 8: Deploy the rendered manifest to the VPS cluster
       - name: Deploy to VPS Cluster
         run: |
-          # Security check: Verify that the KUBE_CONFIG secret is present and not empty
+          # Security check: Verify that the KUBE_CONFIG_BASE64 secret is present and not empty
           if [ -z "${{ secrets.KUBE_CONFIG_BASE64 }}" ]; then
-            echo "ERROR: Secret KUBE_CONFIG is empty or not found!"
+            echo "ERROR: Secret KUBE_CONFIG_BASE64 is empty or not found!"
             exit 1
           fi
 
