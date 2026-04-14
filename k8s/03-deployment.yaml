@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ergo-site
+  namespace: ergo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ergo-site
+  template:
+    metadata:
+      labels:
+        app: ergo-site
+    spec:
+      containers:
+        - name: ergo-site
+          image: tdksoft341/ergo-site:latest
+          ports:
+            - containerPort: 3000

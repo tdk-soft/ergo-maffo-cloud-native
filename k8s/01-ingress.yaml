@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ergo-ingress
+  namespace: ergo
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - ergo.tdksoftconsulting.de
+      secretName: ergo-tls-cert # cert-manager va créer ce secret ici
+  rules:
+    - host: ergo.tdksoftconsulting.de
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ergo-service
+                port:
+                  number: 80

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ergo-service
+  namespace: ergo
+spec:
+  selector:
+    app: ergo-site
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: ClusterIP
