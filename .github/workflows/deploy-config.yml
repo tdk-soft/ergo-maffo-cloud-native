@@ -1,0 +1,10 @@
+# E nvironnements configuration
+environments:
+  staging:
+    url: https://staging.ergo.tdksoft.com
+    deployment_branches:
+      - develop
+  production:
+    url: https://ergo.tdksoft.com
+    deployment_branches:
+      - main

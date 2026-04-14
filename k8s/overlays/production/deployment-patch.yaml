@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ergo-site
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+        - name: ergo-site
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          env:
+            - name: NODE_ENV
+              value: "production"
+          livenessProbe:
+            initialDelaySeconds: 10
+            periodSeconds: 5
