@@ -2,6 +2,7 @@ name: Deploy Ergo Site
 
 on:
   push:
+      - main
     tags:
       - 'v*' # Triggers on v1.0.0, v1.0.1, v1.0.2, etc.
 
@@ -57,15 +58,24 @@ jobs:
 
       - name: Deploy to VPS Cluster
         run: |
-          # 1. Create the kube directory and inject the secret
+          # 1. Security check for the secret
+          if [ -z "${{ secrets.KUBE_CONFIG }}" ]; then
+            echo "ERROR: Secret KUBE_CONFIG is empty or not found!"
+            exit 1
+          fi
+
+          # 2. Setup directory and injection
           mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+          # Use printf to avoid character escaping issues
+          printf "%s" "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
           
-          # 2. Apply the generated manifest to the cluster
-          # We use the specific file created in the previous step
+          # 3. Test connection before applying
+          echo "Testing connection to cluster..."
+          kubectl cluster-info
+          
+          # 4. Apply the manifest
           kubectl apply -f k8s/overlays/production/rendered-manifest.yaml --namespace ergo-prod
           
-          # 3. Wait for the deployment to successfully roll out
-          # This ensures the new pods are healthy before finishing the job
+          # 5. Verify the deployment
           kubectl rollout status deployment prod-ergo-site -n ergo-prod --timeout=120s
