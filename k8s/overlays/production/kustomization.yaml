@@ -1,50 +1,67 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: ergo
-
-bases:
+resources:
   - ../../base
 
-patchesStrategicMerge:
-  - deployment-patch.yaml
-  - ingress-patch.yaml
+namespace: ergo-prod
 
+# We add a different prefix to identify prod resources
+namePrefix: prod-
+
+# 1. Update Image to a stable tag (not 'latest' or 'dev')
+images:
+  - name: ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site
+    newTag: v1.0.0 # Use specific versions for prod
+
+# 2. Scale up replicas using a patch
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: ergo-site
+      spec:
+        replicas: 3
+    target:
+      kind: Deployment
+      name: ergo-site
+
+# 3. Override Ingress Host
+  - patch: |-
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: ergo-ingress
+      spec:
+        rules:
+        - host: ergo-app.com # Your real production domain
+          http:
+            paths:
+            - path: /
+              pathType: Prefix
+              backend:
+                service:
+                  name: ergo-service # Kustomize handles the prefix automatically
+                  port:
+                    number: 80
+        tls:
+        - hosts:
+          - ergo-app.com
+          secretName: ergo-tls-cert-prod
+    target:
+      kind: Ingress
+      name: ergo-ingress
+
+# 4. Load Production Configs
 configMapGenerator:
   - name: ergo-config
     behavior: merge
-    literals:
-      - NODE_ENV=production
-      - LOG_LEVEL=warn
-      - CORS_ENABLED=false
-      - CACHE_TTL=3600
+    envs:
+      - configs/prod-config.env
 
 secretGenerator:
   - name: ergo-secrets
-    behavior: replace
+    behavior: merge
     envs:
-      - secrets.env  # À ajouter dans .gitignore
-
-replicas:
-  - name: ergo-site
-    count: 3
-
-images:
-  - name: ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site
-    newTag: latest
-
-commonAnnotations:
-  environment: production
-  sla-tier: gold
-
-patches:
-  - target:
-      kind: Deployment
-      name: ergo-site
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/limits/memory
-        value: 512Mi
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/limits/cpu
-        value: 500m
+      - configs/prod-secret.env

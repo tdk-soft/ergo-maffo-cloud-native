@@ -1,22 +1,14 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: ergo
+#namespace: ergo
 
+# On ne garde que les structures logiques (pas de fichiers de data brute)
 resources:
   - 00-namespace.yaml
   - 01-deployment.yaml
   - 02-service.yaml
   - 03-ingress.yaml
-  - 04-configmap.yaml
-  - 05-secret.yaml
-  - 06-hpa.yaml
-  - 07-pdb.yaml
-  - 08-networkpolicy.yaml
-
-commonLabels:
-  app.kubernetes.io/managed-by: kustomize
-  app.kubernetes.io/part-of: ergo-platform
 
 commonAnnotations:
   deployed-by: kustomize
@@ -24,32 +16,42 @@ commonAnnotations:
 
 images:
   - name: ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site
-    newName: ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site
     newTag: latest
 
+# Utilisation de fichiers .env pour séparer le code de la donnée
 configMapGenerator:
   - name: ergo-config
-    literals:
-      - NODE_ENV=production
-      - LOG_LEVEL=info
-      - CORS_ENABLED=true
-    behavior: merge
+    envs:
+      - configs/base-config.env
 
 secretGenerator:
   - name: ergo-secrets
-    literals:
-      - API_KEY=placeholder  # À surcharger en production
-    behavior: replace
-    type: Opaque
+    envs:
+      - configs/base-secret.env
+    options:
+      # On RÉACTIVE le hash (bonne pratique) pour forcer le restart des pods si le secret change
+      disableNameSuffixHash: false 
 
-patchesStrategicMerge:
-  - patches/resources.yaml
-  - patches/security.yaml
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: ergo-platform
 
-patchesJson6902:
-  - target:
+patches:
+  - path: patches/monitoring.yaml
+    target:
       group: apps
       version: v1
       kind: Deployment
       name: ergo-site
-    path: patches/monitoring.yaml
+  - path: patches/resources.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: ergo-site
+  - path: patches/security.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: ergo-site

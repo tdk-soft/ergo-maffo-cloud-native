@@ -1,0 +1,11 @@
+# Add Prometheus scraping annotations to the deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ergo-site
+spec:
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"

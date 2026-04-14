@@ -1,0 +1,16 @@
+# Standard security context for hardened containers
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ergo-site
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: ergo-site
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
