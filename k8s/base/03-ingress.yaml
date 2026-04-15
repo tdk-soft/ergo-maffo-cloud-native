@@ -9,10 +9,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - ergo.tdksoftconsulting.de
+        - ergo-maffo.tdksoftconsulting.de
       secretName: ergo-tls-cert
   rules:
-    - host: ergo.tdksoftconsulting.de
+    - host: ergo-maffo.tdksoftconsulting.de
       http:
         paths:
           - path: /
