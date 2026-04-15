@@ -14,20 +14,25 @@ jobs:
       - name: Set up Kustomize
         uses: imranismail/setup-kustomize@v2
 
-      # We render the manifest into a file so the deploy action can see it
+      # Step 1: Render the manifest (The "What")
       - name: Build Kustomize Manifest
         run: |
           cd k8s/overlays/production
           kustomize edit set image ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site=ghcr.io/${{ github.repository }}:${{ github.ref_name }}
           kustomize build . > rendered-manifest.yaml
 
+      # Step 2: Set the Cluster Context (The "Where")
+      - name: Set Kubernetes Context
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG_BASE64 }}
+
+      # Step 3: Deploy (The "How")
       - name: Deploy to VPS
         uses: azure/k8s-deploy@v5
         with:
           action: deploy
           strategy: basic
-          # We point to the file we just created
           manifests: k8s/overlays/production/rendered-manifest.yaml
           namespace: ergo-prod
-          # Use the secret name you have in GitHub (KUBE_CONFIG or KUBE_CONFIG_BASE64)
-          token: ${{ secrets.KUBE_CONFIG_BASE64 }}
