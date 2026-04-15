@@ -1,12 +1,12 @@
 # GitHub Actions workflow for building and deploying Ergo Site to VPS cluster
 name: Deploy Ergo Site
 
-on:
-  push:
-    branches:
-      - main
-    tags:
-      - 'v*'
+#on:
+  #push:
+    #branches:
+      #- main
+    #tags:
+      #- 'v*'
 
 jobs:
   build-and-deploy:

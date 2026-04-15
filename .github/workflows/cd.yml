@@ -1,0 +1,35 @@
+name: CD - Production Deploy
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger only when we push a version tag
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # This job only runs if the push was a tag, ensuring CI logic is "locked"
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Kustomize
+        uses: imranismail/setup-kustomize@v2
+
+      - name: Update Kustomize Image
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          cd k8s/overlays/production
+          kustomize edit set image ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site=ghcr.io/${{ github.repository }}:$TAG_NAME
+
+      - name: Set Kubernetes Context
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG_BASE64 }}
+
+      - name: Deploy to VPS
+        uses: azure/k8s-deploy@v5
+        with:
+          action: deploy
+          kustomizationPath: ./k8s/overlays/production
+          namespace: ergo-prod
