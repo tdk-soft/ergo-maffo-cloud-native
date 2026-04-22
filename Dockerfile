@@ -1,33 +1,32 @@
 # STAGE 1: Build
 FROM node:20-alpine AS builder
 WORKDIR /app
+# On installe les outils nécessaires pour certains packages natifs si besoin
+RUN apk add --no-cache libc6-compat
 COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
 
-# STAGE 2: Production Dependencies
-FROM node:20-alpine AS deps
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-
-# STAGE 3: Final Runner
+# STAGE 2: Runner (Ultra léger)
 FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-# On définit l'utilisateur avant pour la sécurité
-USER node
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
-# On copie uniquement le strict nécessaire
-COPY --from=builder --chown=node:node /app/package.json ./
-COPY --from=builder --chown=node:node /app/.next ./.next
-COPY --from=deps --chown=node:node /app/node_modules ./node_modules
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-# Si vous avez un fichier next.config.js, décommentez la ligne suivante :
-# COPY --from=builder --chown=node:node /app/next.config.js ./
+# On ne copie que le dossier standalone (pré-compilé avec ses propres node_modules)
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+# On lance directement le serveur node (plus rapide et léger que npm start)
+CMD ["node", "server.js"]
