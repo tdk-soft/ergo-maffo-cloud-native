@@ -15,10 +15,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Maffo Ergo Site",
   description: "Cloud Native Solutions",
-  // This points to the file in  'public' folder
   icons: {
-    icon: "/favicon.ico", // or "/logo.png"
-    apple: "/apple-touch-icon.png", // optional for mobile
+    icon: "/assets/logo.png",
+    shortcut: "/assets/logo.png", // Add this line
+    apple: "/assets/logo.png",    // Use your existing logo for apple too
   },
 };
 
