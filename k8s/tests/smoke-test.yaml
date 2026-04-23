@@ -1,0 +1,28 @@
+# tests/smoke-test.yaml
+# A simple Job that checks if the service responds after deployment
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ergo-smoke-test
+  namespace: ergo-prod
+spec:
+  template:
+    spec:
+      containers:
+      - name: curl-check
+        image: curlimages/curl:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            # Wait for the ingress to be propagated (optional)
+            # Then check if the HTTP return code is 200
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://ergo-maffo.tdksoftconsulting.de);
+            if [ "$STATUS" -eq 200 ]; then
+              echo "SUCCESS: Site is live with status 200";
+              exit 0;
+            else
+              echo "FAILED: Site returned status $STATUS";
+              exit 1;
+            fi
+      restartPolicy: OnFailure
+  backoffLimit: 3

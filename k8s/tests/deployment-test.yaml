@@ -1,0 +1,29 @@
+# tests/deployment-test.yaml
+# This file defines security expectations for the deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-security-check
+spec:
+  template:
+    spec:
+      containers:
+        - name: ergo-site
+          # TEST: Verify that the image does NOT run as 'root'
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+          # TEST: Verify the presence of health probes
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+          # TEST: Verify that resource limits are defined
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

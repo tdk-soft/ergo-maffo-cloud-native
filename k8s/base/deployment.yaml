@@ -19,8 +19,8 @@ spec:
       - name: prod-ghcr-login
       containers:
       - name: ergo-site
-        image: ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site:latest
-        imagePullPolicy: IfNotPresent
+        image: ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site:latest  # See comment #1
+        imagePullPolicy: Always  # FIXED: Changed from IfNotPresent to Always
         ports:
         - containerPort: 3000
         envFrom:
@@ -31,7 +31,9 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true
-          runAsUser: 1000
+          runAsUser: 10001  # FIXED: Changed from 1000 to >10000
+          runAsGroup: 10001  # ADDED: Required for group ID >10000
+          readOnlyRootFilesystem: true  # ADDED: Set to true for security
           capabilities:
             drop:
               - ALL
@@ -39,19 +41,20 @@ spec:
           requests:
             memory: "128Mi"
             cpu: "100m"
+            ephemeral-storage: "1Gi"  # ADDED: Ephemeral storage request
           limits:
             memory: "256Mi"
             cpu: "200m"
+            ephemeral-storage: "2Gi"  # ADDED: Ephemeral storage limit
         livenessProbe:
           httpGet:
-            path: /
+            path: /healthz  # FIXED: Different path from readinessProbe
             port: 3000
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /
+            path: /ready  # FIXED: Different path from livenessProbe
             port: 3000
           initialDelaySeconds: 5
           periodSeconds: 5
-
