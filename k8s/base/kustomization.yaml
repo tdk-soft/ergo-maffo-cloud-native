@@ -1,24 +1,20 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-#namespace: ergo
-
-# On ne garde que les structures logiques (pas de fichiers de data brute)
 resources:
-  - 00-namespace.yaml
-  - 01-deployment.yaml
-  - 02-service.yaml
-  - 03-ingress.yaml
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
 
 commonAnnotations:
   deployed-by: kustomize
-  environment: base
+  environment: production
 
 images:
   - name: ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site
     newTag: latest
 
-# Utilisation de fichiers .env pour séparer le code de la donnée
 configMapGenerator:
   - name: ergo-config
     envs:
@@ -29,7 +25,6 @@ secretGenerator:
     envs:
       - configs/base-secret.env
     options:
-      # On RÉACTIVE le hash (bonne pratique) pour forcer le restart des pods si le secret change
       disableNameSuffixHash: false 
 
 commonLabels:
@@ -38,20 +33,5 @@ commonLabels:
 
 patches:
   - path: patches/monitoring.yaml
-    target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: ergo-site
   - path: patches/resources.yaml
-    target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: ergo-site
   - path: patches/security.yaml
-    target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: ergo-site
