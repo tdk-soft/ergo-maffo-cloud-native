@@ -1,6 +1,6 @@
 
-import { services } from "@data/services";
-import ServiceCard from "@/components/ServiceCard";
+import { services } from "@/data/services";
+import ServiceCard from "@/components/ui/ServiceCard";
 
 export default function Leistungen() {
   return (

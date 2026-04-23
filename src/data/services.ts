@@ -14,6 +14,7 @@ Erkrankung und Schädigung des Nervensystems:
 - Querschnittslähmung
 - Long-Covid
     `,
+    slug: "neurologie"
   },
   {
     title: "Pädiatrie",
@@ -28,6 +29,7 @@ Behandlung von Entwicklungsstörungen bei Kindern:
 - Wahrnehmungsstörungen
 - Verzögerte Entwicklung
     `,
+    slug: "pediatrie"
   },
   {
     title: "Geriatrie",
@@ -41,6 +43,7 @@ Unterstützung im Alltag bei älteren Menschen:
 - Sturzprävention
 - Alltagstraining
     `,
+    slug: "geriatrie"
   },
   {
     title: "Handtherapie",
@@ -54,5 +57,6 @@ Behandlung nach Verletzungen oder Erkrankungen:
 - Karpaltunnelsyndrom
 - Postoperative Rehabilitation
     `,
+    slug: "handtherapie"
   },
 ];

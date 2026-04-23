@@ -1,9 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* Enable standalone output to significantly reduce Docker image size 
-     by only including necessary files for production. */
+  /* Indispensable pour Docker */
   output: 'standalone',
+  
+  /* Tes anciennes options du fichier .js */
+  images: {
+    domains: [],
+  },
+  compress: true,
 };
 
 export default nextConfig;

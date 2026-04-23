@@ -3,8 +3,7 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import type { Metadata } from "next";
 import WhatsAppButton from "@/components/layout/WhatsAppButton";
-import Reviews from "@components/sections/Reviews";
-import Map from "@components/sections/Map";
+
 
 export const metadata: Metadata = {
   title: "Ergotherapie Praxis Maffo | Hausbesuche in Dortmund",
@@ -39,6 +38,7 @@ export default function RootLayout({
       <body className="bg-gray-50 text-gray-800">
         <Navbar />
         {children}
+  
         <Footer />
         <WhatsAppButton />
       </body>
