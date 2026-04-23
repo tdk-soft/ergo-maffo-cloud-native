@@ -1,8 +1,8 @@
-name: Ergo Site Pipeline
+name: Maffo Ergotherapie Site Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop, feat*]
     tags: [ 'v*' ]
 
 jobs:
@@ -13,7 +13,7 @@ jobs:
     name: "Build & Push Image"
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.meta.outputs.version }} # On exporte la version pour le job CD
+      version: ${{ steps.meta.outputs.version }} # Exporting the version for the CD job
     steps:
       - uses: actions/checkout@v4
 
@@ -47,8 +47,8 @@ jobs:
   # ---------------------------------------------------------
   cd-deploy:
     name: "Deploy to Production"
-    needs: ci-build # <--- LE GRAPHE SE CRÉE ICI
-    if: startsWith(github.ref, 'refs/tags/v') # Ne déploie QUE si c'est un tag v*
+    needs: ci-build # <--- THE GRAPH IS CREATED HERE
+    if: startsWith(github.ref, 'refs/tags/v') # Deploys ONLY if it's a v* tag
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +59,7 @@ jobs:
       - name: Render Manifest
         run: |
           cd k8s/overlays/production
-          # On utilise l'output du job précédent pour garantir la même version
+          # Using the output from the previous job to guarantee the same version
           kustomize edit set image ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site=ghcr.io/${{ github.repository }}:${{ needs.ci-build.outputs.version }}
           kustomize build . > rendered-manifest.yaml
 

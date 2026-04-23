@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: ergo-site
 spec:
-  replicas: 3
+  replicas: 2
   template:
     spec:
       containers:

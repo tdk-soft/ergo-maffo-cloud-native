@@ -5,55 +5,25 @@ resources:
   - ../../base
 
 namespace: ergo-prod
-
-# We add a different prefix to identify prod resources
 namePrefix: prod-
 
-# 1. Update Image to a stable tag (not 'latest' or 'dev')
 images:
   - name: ghcr.io/tdk-soft/ergo-maffo-cloud-native/ergo-site
-    newTag: v1.0.0 # Use specific versions for prod
+    newTag: v1.0.0
 
-# 2. Scale up replicas using a patch
 patches:
-  - patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: ergo-site
-      spec:
-        replicas: 3
+  
+  - path: patches/deployment-patch.yaml
     target:
       kind: Deployment
       name: ergo-site
-
-# 3. Override Ingress Host
-  - patch: |-
-      apiVersion: networking.k8s.io/v1
-      kind: Ingress
-      metadata:
-        name: ergo-ingress
-      spec:
-        rules:
-        - host: ergo-app.com # Your real production domain
-          http:
-            paths:
-            - path: /
-              pathType: Prefix
-              backend:
-                service:
-                  name: ergo-service # Kustomize handles the prefix automatically
-                  port:
-                    number: 80
-        tls:
-        - hosts:
-          - ergo-app.com
-          secretName: ergo-tls-cert-prod
+  
+  
+  - path: patches/ingress-host-patch.yaml
     target:
       kind: Ingress
       name: ergo-ingress
 
-# 4. Load Production Configs
 configMapGenerator:
   - name: ergo-config
     behavior: merge
